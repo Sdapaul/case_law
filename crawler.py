@@ -6,14 +6,14 @@ API 키 발급: https://open.law.go.kr/lspo/main.do (무료)
 import os
 import logging
 import requests
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 API_URL = "https://www.law.go.kr/DRF/lawSearch.do"
 
 
-def search_new_cases(config: dict) -> list[dict]:
+def search_cases(config: dict) -> list[dict]:
+    """최신 판례를 가져옴 (날짜 필터 없음 — 중복은 main.py에서 seen_cases로 처리)"""
     api_key = os.environ.get("LAW_API_KEY", "").strip()
     if not api_key:
         raise EnvironmentError(
@@ -24,19 +24,12 @@ def search_new_cases(config: dict) -> list[dict]:
     keywords: list = config.get("keywords", [])
     court_name: str = config.get("court_name", "")
     case_type: str = config.get("case_type", "")
-    days_back: int = config.get("days_back", 1)
     max_pages: int = config.get("max_pages", 3)
 
-    cutoff = datetime.now() - timedelta(days=days_back)
     query = " ".join(keywords) if keywords else ""
-
     all_cases: list[dict] = []
-    stop = False
 
     for page in range(1, max_pages + 1):
-        if stop:
-            break
-
         logger.info(f"API 조회 중 (페이지 {page})...")
 
         params = {
@@ -46,7 +39,7 @@ def search_new_cases(config: dict) -> list[dict]:
             "query": query,
             "display": 20,
             "page": page,
-            "sort": "date",
+            "sort": "date",  # 최신 선고일 순
         }
 
         try:
@@ -57,10 +50,7 @@ def search_new_cases(config: dict) -> list[dict]:
             logger.error(f"API 오류 (페이지 {page}): {exc}")
             break
 
-        prec_search = data.get("PrecSearch", {})
-        raw_list = prec_search.get("prec", [])
-
-        # 단건일 때 dict로 내려오는 경우 처리
+        raw_list = data.get("PrecSearch", {}).get("prec", [])
         if isinstance(raw_list, dict):
             raw_list = [raw_list]
         if not raw_list:
@@ -68,34 +58,16 @@ def search_new_cases(config: dict) -> list[dict]:
             break
 
         for raw in raw_list:
-            case_date = _parse_date(raw.get("선고일자", ""))
-            if case_date and case_date < cutoff:
-                stop = True  # 날짜순 정렬이므로 이후 결과도 기간 밖
-                break
-
-            # 법원 필터
             if court_name and court_name not in raw.get("법원명", ""):
                 continue
-            # 사건유형 필터
             if case_type and case_type not in raw.get("사건종류명", ""):
                 continue
-
             all_cases.append(_normalize(raw))
 
-        # 페이지당 20건 미만이면 마지막 페이지
         if len(raw_list) < 20:
             break
 
-    logger.info(f"총 {len(all_cases)}건 수집 완료")
     return all_cases
-
-
-def _parse_date(date_str: str) -> datetime | None:
-    """'20240115' → datetime"""
-    try:
-        return datetime.strptime(date_str.strip(), "%Y%m%d")
-    except (ValueError, AttributeError):
-        return None
 
 
 def _normalize(raw: dict) -> dict:
@@ -105,8 +77,7 @@ def _normalize(raw: dict) -> dict:
 
     seq = raw.get("판례일련번호", "")
     link = (
-        f"https://www.law.go.kr/precInfoP.do?mode=0&precSeq={seq}"
-        if seq else ""
+        f"https://www.law.go.kr/precInfoP.do?mode=0&precSeq={seq}" if seq else ""
     )
 
     summary = raw.get("판시사항", "") or raw.get("판결요지", "") or ""
