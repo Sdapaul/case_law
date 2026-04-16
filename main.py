@@ -83,6 +83,12 @@ def main() -> None:
         c for c in all_cases
         if c.get("case_num", "-") not in sent
     ]
+
+    # 선고일 최신순 정렬 (날짜 없는 항목은 뒤로)
+    new_cases.sort(
+        key=lambda c: c.get("date", "") or "0000.00.00",
+        reverse=True,
+    )
     logger.info(f"새 판례: {len(new_cases)}건")
 
     if not new_cases:
