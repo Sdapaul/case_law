@@ -35,6 +35,7 @@ jobs:
 
       - name: 판례 크롤링 및 이메일 발송
         env:
+          LAW_API_KEY: ${{ secrets.LAW_API_KEY }}
           GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAILS: ${{ secrets.RECIPIENT_EMAILS }}
