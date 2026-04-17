@@ -4,6 +4,7 @@ API 키 발급: https://open.law.go.kr/lspo/main.do (무료)
 """
 
 import os
+import time
 import logging
 import requests
 
@@ -42,12 +43,33 @@ def search_cases(config: dict) -> list[dict]:
             "sort": "date",  # 최신 선고일 순
         }
 
-        try:
-            resp = requests.get(API_URL, params=params, timeout=30)
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as exc:
-            logger.error(f"API 오류 (페이지 {page}): {exc}")
+        data = None
+        for attempt in range(1, 4):  # 최대 3회 재시도
+            try:
+                resp = requests.get(
+                    API_URL,
+                    params=params,
+                    timeout=30,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/124.0.0.0 Safari/537.36"
+                        ),
+                        "Accept": "application/json, text/javascript, */*",
+                        "Accept-Language": "ko-KR,ko;q=0.9",
+                        "Referer": "https://www.law.go.kr/",
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                break
+            except Exception as exc:
+                logger.warning(f"API 오류 (페이지 {page}, 시도 {attempt}/3): {exc}")
+                if attempt < 3:
+                    time.sleep(3 * attempt)
+        if data is None:
+            logger.error(f"페이지 {page} 3회 모두 실패 — 중단")
             break
 
         raw_list = data.get("PrecSearch", {}).get("prec", [])
