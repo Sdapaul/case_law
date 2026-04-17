@@ -23,6 +23,7 @@ from pathlib import Path
 
 from crawler import search_cases
 from emailer import send_case_email
+from summarizer import add_ai_summaries
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,6 +96,8 @@ def main() -> None:
         logger.info("새 판례가 없습니다. 이메일을 발송하지 않습니다.")
         return
 
+    add_ai_summaries(new_cases)
+
     if args.dry_run:
         logger.info("=== [DRY-RUN] 새 판례 목록 ===")
         for i, c in enumerate(new_cases, 1):
@@ -102,6 +105,8 @@ def main() -> None:
                 f"{i}. [{c.get('date','-')}] {c.get('title','-')}"
                 f" | {c.get('case_num','-')} | {c.get('court','-')}"
             )
+            if c.get("summary"):
+                print(f"   요약: {c['summary'][:100]}...")
         return
 
     send_case_email(new_cases, config)

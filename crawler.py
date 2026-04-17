@@ -88,6 +88,6 @@ def _normalize(raw: dict) -> dict:
         "court": raw.get("법원명", "-"),
         "case_type": raw.get("사건종류명", ""),
         "date": date_str,
-        "summary": summary[:200],
+        "summary": summary[:500],
         "link": link,
     }

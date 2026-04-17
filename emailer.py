@@ -86,7 +86,7 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
 
     rows = ""
     for i, c in enumerate(cases, 1):
-        bg = "#f9f9f9" if i % 2 == 0 else "#ffffff"
+        bg = "#f2f6ff" if i % 2 == 0 else "#ffffff"
         title = c.get("title", "-")
         link = c.get("link", "#")
         case_num = c.get("case_num", "-")
@@ -94,59 +94,65 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
         date = c.get("date", "-")
         summary = c.get("summary", "")
 
-        summary_html = (
-            f'<br><small style="color:#666;font-size:12px;">{summary}</small>'
-            if summary else ""
-        )
+        summary_html = ""
+        if summary:
+            summary_html = (
+                f'<div style="margin-top:7px;font-size:12px;color:#1a3366;'
+                f'background:#e8f0fe;padding:6px 10px;'
+                f'border-left:3px solid #1a56c4;">'
+                f'<strong style="color:#444444;">AI 요약:</strong> {summary}'
+                f'</div>'
+            )
 
         rows += f"""
         <tr style="background:{bg};">
-          <td style="padding:12px 15px;border-bottom:1px solid #eee;">
-            <a href="{link}" style="color:#1a73e8;text-decoration:none;font-weight:bold;">{title}</a>
+          <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;">
+            <a href="{link}" style="color:#1a56c4;text-decoration:none;font-weight:bold;font-size:14px;">{title}</a>
             {summary_html}
           </td>
-          <td style="padding:12px 15px;border-bottom:1px solid #eee;white-space:nowrap;color:#333;">{case_num}</td>
-          <td style="padding:12px 15px;border-bottom:1px solid #eee;white-space:nowrap;color:#333;">{court}</td>
-          <td style="padding:12px 15px;border-bottom:1px solid #eee;white-space:nowrap;color:#333;">{date}</td>
+          <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{case_num}</td>
+          <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{court}</td>
+          <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{date}</td>
         </tr>"""
 
+    # Outlook은 linear-gradient, box-shadow, border-radius 미지원 → 단색 배경 사용
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="font-family:'Malgun Gothic',Arial,sans-serif;background:#f4f6f8;margin:0;padding:20px;">
-  <div style="max-width:900px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+<body style="font-family:'Malgun Gothic',Arial,sans-serif;background:#f0f2f5;margin:0;padding:20px;">
+  <div style="max-width:900px;margin:0 auto;background:#ffffff;border:1px solid #cccccc;">
 
-    <div style="background:linear-gradient(135deg,#1a73e8,#0d47a1);padding:24px 28px;color:white;">
-      <h1 style="margin:0;font-size:22px;letter-spacing:-0.5px;">⚖️ 판례 알림</h1>
-      <p style="margin:6px 0 0;opacity:0.88;font-size:14px;">{now_str} 기준 &nbsp;|&nbsp; 총 <strong>{len(cases)}건</strong></p>
+    <div style="background:#1a56c4;padding:24px 28px;">
+      <h1 style="margin:0;font-size:22px;color:#ffffff;letter-spacing:-0.5px;">&#9878; 판례 알림</h1>
+      <p style="margin:6px 0 0;font-size:14px;color:#c8dfff;">{now_str} 기준 &nbsp;|&nbsp; 총 <strong style="color:#ffffff;">{len(cases)}건</strong></p>
     </div>
 
-    <div style="background:#e8f0fe;padding:14px 28px;border-left:4px solid #1a73e8;font-size:14px;color:#333;">
+    <div style="background:#ddeaff;padding:14px 28px;border-left:4px solid #1a56c4;font-size:14px;color:#111111;">
       <strong>검색 조건</strong> &nbsp;
       키워드: <strong>{keywords_str}</strong> &nbsp;|&nbsp;
       법원: <strong>{court_str}</strong> &nbsp;|&nbsp;
       사건유형: <strong>{case_type_str}</strong>
-      <br style="margin-top:4px;">
+      <br>
       수신자: <strong>{', '.join(recipients)}</strong>
     </div>
 
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <thead>
-          <tr style="background:#34495e;color:white;">
-            <th style="padding:12px 15px;text-align:left;font-weight:600;">판례명</th>
-            <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;">사건번호</th>
-            <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;">법원</th>
-            <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;">선고일</th>
+          <tr style="background:#2c3e6b;">
+            <th style="padding:12px 15px;text-align:left;font-weight:600;color:#ffffff;">판례명</th>
+            <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;color:#ffffff;">사건번호</th>
+            <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;color:#ffffff;">법원</th>
+            <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;color:#ffffff;">선고일</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>
     </div>
 
-    <div style="padding:16px 28px;background:#f4f6f8;font-size:12px;color:#888;text-align:center;">
+    <div style="padding:16px 28px;background:#f0f2f5;font-size:12px;color:#555555;text-align:center;border-top:1px solid #cccccc;">
       이 메일은 자동 발송되었습니다. &nbsp;
-      출처: <a href="https://glaw.scourt.go.kr" style="color:#1a73e8;">대법원 종합법률정보</a>
+      출처: <a href="https://glaw.scourt.go.kr" style="color:#1a56c4;">대법원 종합법률정보</a>
     </div>
   </div>
 </body>
