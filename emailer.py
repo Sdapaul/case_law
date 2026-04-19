@@ -63,16 +63,22 @@ def _build_plain(cases: list[dict], config: dict, recipients: list[str]) -> str:
         "-" * 60,
         "",
     ]
+    prev_priority = None
     for i, c in enumerate(cases, 1):
+        is_priority = c.get("priority", False)
+        if is_priority != prev_priority:
+            lines.append("★ 주요 관심 법률 판례" if is_priority else "○ 기타 판례")
+            lines.append("-" * 40)
+            prev_priority = is_priority
         lines += [
             f"{i}. {c.get('title', '-')}",
             f"   사건번호: {c.get('case_num', '-')}",
             f"   법원    : {c.get('court', '-')}",
-            f"   선고일  : {c.get('date', '-')}",
+            f"   선고일  : {c.get('date', '-') or '-'}",
             f"   링크    : {c.get('link', '-')}",
         ]
         if c.get("summary"):
-            lines.append(f"   요약    : {c['summary']}")
+            lines.append(f"   AI 요약 : {c['summary']}")
         lines.append("")
     lines.append("출처: https://glaw.scourt.go.kr")
     return "\n".join(lines)
@@ -85,13 +91,35 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
     case_type_str = config.get("case_type") or "전체"
 
     rows = ""
-    for i, c in enumerate(cases, 1):
-        bg = "#f2f6ff" if i % 2 == 0 else "#ffffff"
+    prev_priority = None
+    row_idx = 0
+    for c in cases:
+        is_priority = c.get("priority", False)
+
+        # 그룹 구분 헤더 (우선순위 법률 / 기타)
+        if is_priority != prev_priority:
+            if is_priority:
+                header_label = "&#9733; 주요 관심 법률 판례"
+                header_bg = "#1a3a6b"
+            else:
+                header_label = "&#9675; 기타 판례"
+                header_bg = "#4a5568"
+            rows += f"""
+        <tr>
+          <td colspan="4" style="padding:10px 15px;background:{header_bg};
+              color:#ffffff;font-size:13px;font-weight:bold;letter-spacing:0.3px;">
+            {header_label}
+          </td>
+        </tr>"""
+            prev_priority = is_priority
+
+        row_idx += 1
+        bg = "#f2f6ff" if row_idx % 2 == 0 else "#ffffff"
         title = c.get("title", "-")
         link = c.get("link", "#")
         case_num = c.get("case_num", "-")
         court = c.get("court", "-")
-        date = c.get("date", "-")
+        date = c.get("date", "-") or "-"
         summary = c.get("summary", "")
 
         summary_html = ""

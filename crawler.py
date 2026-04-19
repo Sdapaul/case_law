@@ -93,23 +93,29 @@ def search_cases(config: dict) -> list[dict]:
 
 
 def _normalize(raw: dict) -> dict:
-    date_str = raw.get("선고일자", "")
+    date_str = raw.get("선고일자", "") or ""
     if len(date_str) == 8:
-        date_str = f"{date_str[:4]}.{date_str[4:6]}.{date_str[6:]}"
+        formatted = f"{date_str[:4]}.{date_str[4:6]}.{date_str[6:]}"
+        # 0001.01.01 등 무효 날짜 제외
+        date_str = formatted if date_str > "19000101" else ""
 
-    seq = raw.get("판례일련번호", "")
+    seq = raw.get("판례일련번호", "") or ""
     link = (
         f"https://www.law.go.kr/precInfoP.do?mode=0&precSeq={seq}" if seq else ""
     )
 
+    case_num = raw.get("사건번호") or ""
+    court = raw.get("법원명") or ""
     summary = raw.get("판시사항", "") or raw.get("판결요지", "") or ""
 
     return {
-        "title": raw.get("사건명", "-"),
-        "case_num": raw.get("사건번호", "-"),
-        "court": raw.get("법원명", "-"),
-        "case_type": raw.get("사건종류명", ""),
+        "seq": seq,                        # 판례 고유번호 (중복 방지 키)
+        "title": raw.get("사건명") or "-",
+        "case_num": case_num or "-",
+        "court": court or "-",
+        "case_type": raw.get("사건종류명") or "",
         "date": date_str,
         "summary": summary[:500],
+        "statutes": raw.get("참조조문") or "",  # 참조 법령 (우선순위 정렬용)
         "link": link,
     }

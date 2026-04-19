@@ -21,13 +21,13 @@ DELAY_SEC = 4.5  # 15 RPM → 4s 간격 (여유분 0.5s)
 
 
 def add_ai_summaries(cases: list[dict]) -> None:
-    """판례 목록에 AI 요약을 in-place로 추가. GEMINI_API_KEY 없으면 no-op."""
+    """판례 목록 전체에 AI 요약을 in-place로 추가. GEMINI_API_KEY 없으면 no-op."""
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
-        logger.info("GEMINI_API_KEY 없음 — 기존 판시사항을 요약으로 사용합니다.")
+        logger.info("GEMINI_API_KEY 없음 — AI 요약을 건너뜁니다.")
         return
 
-    targets = [c for c in cases if c.get("summary")][:MAX_CASES]
+    targets = cases[:MAX_CASES]
     total = len(targets)
     if total == 0:
         return
@@ -37,7 +37,7 @@ def add_ai_summaries(cases: list[dict]) -> None:
         if i > 0:
             time.sleep(DELAY_SEC)
         try:
-            case["summary"] = _call_gemini(case["summary"], api_key)
+            case["summary"] = _call_gemini(case, api_key)
             logger.info(f"  [{i+1}/{total}] 요약 완료: {case.get('case_num', '')}")
         except Exception as exc:
             logger.warning(f"  [{i+1}/{total}] Gemini 실패 (원문 유지): {exc}")
@@ -45,10 +45,19 @@ def add_ai_summaries(cases: list[dict]) -> None:
     logger.info("AI 요약 완료.")
 
 
-def _call_gemini(text: str, api_key: str) -> str:
+def _call_gemini(case: dict, api_key: str) -> str:
+    existing = case.get("summary") or ""
+    title = case.get("title") or ""
+    case_type = case.get("case_type") or ""
+
+    if existing:
+        source = f"판시사항:\n{existing}"
+    else:
+        source = f"사건명: {title}\n사건종류: {case_type}"
+
     prompt = (
-        "다음 법원 판시사항을 법률 비전문가도 이해하기 쉽게 2~3문장으로 요약해 주세요. "
-        "핵심 쟁점과 판단 결론을 포함하세요:\n\n" + text
+        "다음 법원 판례 정보를 법률 비전문가도 이해하기 쉽게 2~3문장으로 요약해 주세요. "
+        "핵심 쟁점과 판단 결론을 포함하세요:\n\n" + source
     )
     resp = requests.post(
         GEMINI_URL,

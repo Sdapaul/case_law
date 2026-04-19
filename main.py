@@ -25,6 +25,59 @@ from crawler import search_cases
 from emailer import send_case_email
 from summarizer import add_ai_summaries
 
+PRIORITY_LAWS = {
+    "금융회사의 지배구조에 관한 법률",
+    "상법",
+    "형법",
+    "개인금융채권의 관리 및 개인금융채무자의 보호에 관한 법률",
+    "공중 등 협박목적 및 대량살상무기확산을 위한 자금조달행위의 금지에 관한 법률",
+    "금융거래지표의 관리에 관한 법률",
+    "금융산업의 구조개선에 관한 법률",
+    "금융소비자 보호에 관한 법률",
+    "금융위원회의 설치 등에 관한 법률",
+    "금융혁신지원 특별법",
+    "기업구조조정 촉진법",
+    "기업구조조정투자회사법",
+    "대부업 등의 등록 및 금융이용자 보호에 관한 법률",
+    "보험사기방지 특별법",
+    "보험업법",
+    "감정평가 및 감정평가사에 관한 법률",
+    "서민의 금융생활 지원에 관한 법률",
+    "신용정보의 이용 및 보호에 관한 법률",
+    "예금자보호법",
+    "외국인투자 촉진법",
+    "외국환거래법",
+    "자본시장과 금융투자업에 관한 법률",
+    "전자금융거래법",
+    "주식ㆍ사채 등의 전자등록에 관한 법률",
+    "주식회사 등의 외부감사에 관한 법률",
+    "채권의 공정한 추심에 관한 법률",
+    "특정 금융거래정보의 보고 및 이용 등에 관한 법률",
+    "한국주택금융공사법",
+    "개인정보 보호법",
+    "공익신고자 보호법",
+    "독점규제 및 공정거래에 관한 법률",
+    "마약류 불법거래 방지에 관한 특례법",
+    "범죄수익은닉의 규제 및 처벌 등에 관한 법률",
+    "약관의 규제에 관한 법률",
+    "전기통신금융사기 피해 방지 및 피해금 환급에 관한 특별법",
+    "특정경제범죄 가중처벌 등에 관한 법률",
+    "근로자퇴직급여 보장법",
+    "금융지주회사법",
+    "산업안전보건법",
+    "유사수신행위의 규제에 관한 법률",
+    "인공지능 발전과 신뢰 기반 조성 등에 관한 기본법",
+    "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+    "중대재해 처벌 등에 관한 법률",
+}
+
+
+def _is_priority(case: dict) -> bool:
+    """참조조문 또는 사건명에 우선순위 법률이 포함되어 있으면 True"""
+    text = (case.get("statutes") or "") + " " + (case.get("title") or "")
+    return any(law in text for law in PRIORITY_LAWS)
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -79,17 +132,24 @@ def main() -> None:
     all_cases = search_cases(config)
     logger.info(f"API 조회 결과: {len(all_cases)}건")
 
-    # 이미 발송한 사건 제외
+    # 이미 발송한 사건 제외 (seq 우선, 없으면 case_num으로 확인)
     new_cases = [
         c for c in all_cases
-        if c.get("case_num", "-") not in sent
+        if (c.get("seq") or c.get("case_num", "-")) not in sent
     ]
 
-    # 선고일 최신순 정렬 (날짜 없는 항목은 뒤로)
-    new_cases.sort(
-        key=lambda c: c.get("date", "") or "0000.00.00",
-        reverse=True,
-    )
+    # 우선순위 법률 판례 먼저, 각 그룹 내 선고일 최신순
+    priority_cases = [c for c in new_cases if _is_priority(c)]
+    other_cases = [c for c in new_cases if not _is_priority(c)]
+    priority_cases.sort(key=lambda c: c.get("date", "") or "0000.00.00", reverse=True)
+    other_cases.sort(key=lambda c: c.get("date", "") or "0000.00.00", reverse=True)
+
+    for c in priority_cases:
+        c["priority"] = True
+    for c in other_cases:
+        c["priority"] = False
+
+    new_cases = priority_cases + other_cases
     logger.info(f"새 판례: {len(new_cases)}건")
 
     if not new_cases:
@@ -111,8 +171,11 @@ def main() -> None:
 
     send_case_email(new_cases, config)
 
-    # 발송 완료 후 사건번호 기록
-    sent.update(c["case_num"] for c in new_cases if c.get("case_num"))
+    # 발송 완료 후 고유 ID 기록 (seq 우선, 없으면 case_num)
+    for c in new_cases:
+        uid = c.get("seq") or c.get("case_num")
+        if uid and uid != "-":
+            sent.add(uid)
     save_sent(sent)
     logger.info(f"sent_cases.json 업데이트 완료 (누적 {len(sent)}건)")
 
