@@ -1,6 +1,6 @@
 """
-Gemini 1.5 Flash (무료 tier) 로 판시사항을 쉬운 한국어로 요약.
-GEMINI_API_KEY 환경변수가 없으면 기존 판시사항을 그대로 사용.
+Gemini 2.0 Flash (무료 tier) 로 판시사항을 쉬운 한국어로 요약.
+GEMINI_API_KEY 환경변수가 없으면 AI 요약을 건너뜀.
 
 무료 한도: 분당 15회 / 일 1,500회
 """
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta"
-    "/models/gemini-1.5-flash:generateContent"
+    "/models/gemini-2.0-flash:generateContent"
 )
 MAX_CASES = 50   # 무료 tier 안전 상한
 DELAY_SEC = 4.5  # 15 RPM → 4s 간격 (여유분 0.5s)
