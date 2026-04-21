@@ -6,9 +6,12 @@ API 키 발급: https://open.law.go.kr/lspo/main.do (무료)
 import os
 import time
 import logging
+from datetime import datetime, timedelta
 import requests
 
 logger = logging.getLogger(__name__)
+
+FRESH_DAYS = 30  # 선고일 기준 이 일수 이내면 최신 판례로 표시
 
 API_URL = "https://www.law.go.kr/DRF/lawSearch.do"
 
@@ -108,6 +111,8 @@ def _normalize(raw: dict) -> dict:
     court = raw.get("법원명") or ""
     summary = raw.get("판시사항", "") or raw.get("판결요지", "") or ""
 
+    is_fresh = _check_freshness(date_str)
+
     return {
         "seq": seq,                        # 판례 고유번호 (중복 방지 키)
         "title": raw.get("사건명") or "-",
@@ -118,4 +123,16 @@ def _normalize(raw: dict) -> dict:
         "summary": summary[:500],
         "statutes": raw.get("참조조문") or "",  # 참조 법령 (우선순위 정렬용)
         "link": link,
+        "is_fresh": is_fresh,
     }
+
+
+def _check_freshness(date_str: str) -> bool:
+    """선고일이 FRESH_DAYS 이내면 True (최신 판례)"""
+    if not date_str:
+        return False
+    try:
+        decision_date = datetime.strptime(date_str, "%Y.%m.%d")
+        return (datetime.now() - decision_date).days <= FRESH_DAYS
+    except ValueError:
+        return False

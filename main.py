@@ -24,6 +24,7 @@ from pathlib import Path
 from crawler import search_cases
 from emailer import send_case_email
 from summarizer import add_ai_summaries
+from db import save_cases
 
 PRIORITY_LAWS = {
     "금융회사의 지배구조에 관한 법률",
@@ -178,6 +179,9 @@ def main() -> None:
             sent.add(uid)
     save_sent(sent)
     logger.info(f"sent_cases.json 업데이트 완료 (누적 {len(sent)}건)")
+
+    save_cases(new_cases)
+    logger.info("cases_db.sqlite 업데이트 완료")
 
 
 if __name__ == "__main__":

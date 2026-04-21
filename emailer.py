@@ -3,7 +3,11 @@ import smtplib
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from datetime import datetime
+
+from excel_export import generate_excel
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +23,6 @@ def _get_env(key: str) -> str:
 
 
 def _parse_recipients() -> list[str]:
-    """환경변수 RECIPIENT_EMAILS (쉼표 구분) → 리스트"""
     raw = _get_env("RECIPIENT_EMAILS")
     recipients = [addr.strip() for addr in raw.split(",") if addr.strip()]
     if not recipients:
@@ -28,20 +31,42 @@ def _parse_recipients() -> list[str]:
 
 
 def send_case_email(cases: list[dict], config: dict) -> None:
-    sender = _get_env("GMAIL_SENDER")
-    password = _get_env("GMAIL_APP_PASSWORD")
+    sender     = _get_env("GMAIL_SENDER")
+    password   = _get_env("GMAIL_APP_PASSWORD")
     recipients = _parse_recipients()
 
     now_str = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
     subject = f"[판례 알림] {now_str} — {len(cases)}건 새 판례"
 
-    msg = MIMEMultipart("alternative")
+    msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = ", ".join(recipients)
+    msg["From"]    = sender
+    msg["To"]      = ", ".join(recipients)
 
-    msg.attach(MIMEText(_build_plain(cases, config, recipients), "plain", "utf-8"))
-    msg.attach(MIMEText(_build_html(cases, config, recipients), "html", "utf-8"))
+    # HTML + plain text
+    alt = MIMEMultipart("alternative")
+    alt.attach(MIMEText(_build_plain(cases, config, recipients), "plain", "utf-8"))
+    alt.attach(MIMEText(_build_html(cases, config, recipients), "html", "utf-8"))
+    msg.attach(alt)
+
+    # Excel 첨부
+    try:
+        excel_cases = []
+        today = datetime.now().strftime("%Y-%m-%d")
+        for c in cases:
+            row = dict(c)
+            row["sent_date"] = today
+            excel_cases.append(row)
+        excel_bytes = generate_excel(excel_cases, title="판례목록")
+        fname = f"판례목록_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        part = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        part.set_payload(excel_bytes)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{fname}"')
+        msg.attach(part)
+        logger.info(f"Excel 첨부 완료: {fname}")
+    except Exception as exc:
+        logger.warning(f"Excel 첨부 실패 (이메일은 발송): {exc}")
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(sender, password)
@@ -70,24 +95,29 @@ def _build_plain(cases: list[dict], config: dict, recipients: list[str]) -> str:
             lines.append("★ 주요 관심 법률 판례" if is_priority else "○ 기타 판례")
             lines.append("-" * 40)
             prev_priority = is_priority
+        link = c.get("link", "-") or "-"
+        fresh_mark = " [최신]" if c.get("is_fresh") else ""
         lines += [
-            f"{i}. {c.get('title', '-')}",
+            f"{i}. {c.get('title', '-')}{fresh_mark}",
             f"   사건번호: {c.get('case_num', '-')}",
             f"   법원    : {c.get('court', '-')}",
             f"   선고일  : {c.get('date', '-') or '-'}",
-            f"   링크    : {c.get('link', '-')}",
+            f"   참조URL : {link}",
         ]
         if c.get("summary"):
-            lines.append(f"   AI 요약 : {c['summary']}")
+            lines.append(f"   AI요약  : {c['summary']}")
         lines.append("")
-    lines.append("출처: https://glaw.scourt.go.kr")
+    lines += [
+        "출처: https://glaw.scourt.go.kr (대법원 종합법률정보)",
+        "     https://www.law.go.kr (법제처 국가법령정보)",
+    ]
     return "\n".join(lines)
 
 
 def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
-    now_str = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
+    now_str      = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
     keywords_str = ", ".join(config.get("keywords", [])) or "없음"
-    court_str = config.get("court_name") or "전체"
+    court_str    = config.get("court_name") or "전체"
     case_type_str = config.get("case_type") or "전체"
 
     rows = ""
@@ -95,15 +125,15 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
     row_idx = 0
     for c in cases:
         is_priority = c.get("priority", False)
+        is_fresh    = c.get("is_fresh", False)
 
-        # 그룹 구분 헤더 (우선순위 법률 / 기타)
         if is_priority != prev_priority:
             if is_priority:
                 header_label = "&#9733; 주요 관심 법률 판례"
-                header_bg = "#1a3a6b"
+                header_bg    = "#1a3a6b"
             else:
                 header_label = "&#9675; 기타 판례"
-                header_bg = "#4a5568"
+                header_bg    = "#4a5568"
             rows += f"""
         <tr>
           <td colspan="4" style="padding:10px 15px;background:{header_bg};
@@ -114,13 +144,18 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
             prev_priority = is_priority
 
         row_idx += 1
-        bg = "#f2f6ff" if row_idx % 2 == 0 else "#ffffff"
-        title = c.get("title", "-")
-        link = c.get("link", "#")
+        bg       = "#f2f6ff" if row_idx % 2 == 0 else "#ffffff"
+        title    = c.get("title", "-")
+        link     = c.get("link", "#") or "#"
         case_num = c.get("case_num", "-")
-        court = c.get("court", "-")
-        date = c.get("date", "-") or "-"
-        summary = c.get("summary", "")
+        court    = c.get("court", "-")
+        date     = c.get("date", "-") or "-"
+        summary  = c.get("summary", "")
+        fresh_badge = (
+            '<span style="display:inline-block;background:#28a745;color:#fff;'
+            'font-size:10px;padding:1px 5px;border-radius:3px;margin-left:5px;">최신</span>'
+            if is_fresh else ""
+        )
 
         summary_html = ""
         if summary:
@@ -128,22 +163,28 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
                 f'<div style="margin-top:7px;font-size:12px;color:#1a3366;'
                 f'background:#e8f0fe;padding:6px 10px;'
                 f'border-left:3px solid #1a56c4;">'
-                f'<strong style="color:#444444;">AI 요약:</strong> {summary}'
+                f'<strong style="color:#444444;">AI요약:</strong> {summary}'
                 f'</div>'
             )
+
+        url_html = (
+            f'<div style="margin-top:5px;font-size:11px;color:#666666;">'
+            f'&#128279; <a href="{link}" style="color:#1a56c4;">{link}</a>'
+            f'</div>'
+        ) if link and link != "#" else ""
 
         rows += f"""
         <tr style="background:{bg};">
           <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;">
-            <a href="{link}" style="color:#1a56c4;text-decoration:none;font-weight:bold;font-size:14px;">{title}</a>
+            <a href="{link}" style="color:#1a56c4;text-decoration:none;font-weight:bold;font-size:14px;">{title}</a>{fresh_badge}
             {summary_html}
+            {url_html}
           </td>
           <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{case_num}</td>
           <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{court}</td>
           <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{date}</td>
         </tr>"""
 
-    # Outlook은 linear-gradient, box-shadow, border-radius 미지원 → 단색 배경 사용
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -178,9 +219,11 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
       </table>
     </div>
 
-    <div style="padding:16px 28px;background:#f0f2f5;font-size:12px;color:#555555;text-align:center;border-top:1px solid #cccccc;">
-      이 메일은 자동 발송되었습니다. &nbsp;
+    <div style="padding:16px 28px;background:#f0f2f5;font-size:12px;color:#555555;border-top:1px solid #cccccc;">
+      이 메일은 자동 발송되었습니다.<br>
       출처: <a href="https://glaw.scourt.go.kr" style="color:#1a56c4;">대법원 종합법률정보</a>
+      &nbsp;|&nbsp;
+      <a href="https://www.law.go.kr" style="color:#1a56c4;">법제처 국가법령정보</a>
     </div>
   </div>
 </body>
