@@ -128,6 +128,7 @@ def main() -> None:
     logger.info(f"  키워드  : {config.get('keywords') or '없음'}")
     logger.info(f"  법원    : {config.get('court_name') or '전체'}")
     logger.info(f"  사건유형: {config.get('case_type') or '전체'}")
+    logger.info(f"  선고일  : 최근 {config.get('days_back', 30)}일 이내")
     logger.info(f"  기발송  : {len(sent)}건 (중복 제외 대상)")
 
     all_cases = search_cases(config)

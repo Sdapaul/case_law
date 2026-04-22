@@ -17,7 +17,7 @@ API_URL = "https://www.law.go.kr/DRF/lawSearch.do"
 
 
 def search_cases(config: dict) -> list[dict]:
-    """최신 판례를 가져옴 (날짜 필터 없음 — 중복은 main.py에서 seen_cases로 처리)"""
+    """최신 판례를 가져옴 (선고일 기준 days_back 이내만 포함)"""
     api_key = os.environ.get("LAW_API_KEY", "").strip()
     if not api_key:
         raise EnvironmentError(
@@ -29,6 +29,8 @@ def search_cases(config: dict) -> list[dict]:
     court_name: str = config.get("court_name", "")
     case_type: str = config.get("case_type", "")
     max_pages: int = config.get("max_pages", 3)
+    days_back: int = config.get("days_back", 30)
+    cutoff = (datetime.now() - timedelta(days=days_back)).strftime("%Y.%m.%d")
 
     query = " ".join(keywords) if keywords else ""
     all_cases: list[dict] = []
@@ -82,14 +84,21 @@ def search_cases(config: dict) -> list[dict]:
             logger.info("더 이상 결과가 없습니다.")
             break
 
+        page_added = 0
         for raw in raw_list:
             if court_name and court_name not in raw.get("법원명", ""):
                 continue
             if case_type and case_type not in raw.get("사건종류명", ""):
                 continue
-            all_cases.append(_normalize(raw))
+            case = _normalize(raw)
+            # 선고일이 cutoff 보다 오래된 경우 → 이후 페이지도 더 오래됐으므로 중단
+            if case["date"] and case["date"] < cutoff:
+                logger.info(f"선고일 {case['date']} < 기준일 {cutoff} — 조회 중단")
+                return all_cases
+            all_cases.append(case)
+            page_added += 1
 
-        if len(raw_list) < 20:
+        if len(raw_list) < 20 or page_added == 0:
             break
 
     return all_cases

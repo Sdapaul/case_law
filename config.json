@@ -2,5 +2,6 @@
   "keywords": [],
   "court_name": "",
   "case_type": "",
-  "max_pages": 5
+  "max_pages": 5,
+  "days_back": 30
 }
