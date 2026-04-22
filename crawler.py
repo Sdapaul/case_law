@@ -45,7 +45,6 @@ def search_cases(config: dict) -> list[dict]:
             "query": query,
             "display": 20,
             "page": page,
-            "sort": "date",  # 최신 선고일 순
         }
 
         data = None
@@ -84,21 +83,17 @@ def search_cases(config: dict) -> list[dict]:
             logger.info("더 이상 결과가 없습니다.")
             break
 
-        page_added = 0
         for raw in raw_list:
             if court_name and court_name not in raw.get("법원명", ""):
                 continue
             if case_type and case_type not in raw.get("사건종류명", ""):
                 continue
             case = _normalize(raw)
-            # 선고일이 cutoff 보다 오래된 경우 → 이후 페이지도 더 오래됐으므로 중단
             if case["date"] and case["date"] < cutoff:
-                logger.info(f"선고일 {case['date']} < 기준일 {cutoff} — 조회 중단")
-                return all_cases
+                continue  # 오래된 항목은 건너뜀 (조기 종료 없이 계속 스캔)
             all_cases.append(case)
-            page_added += 1
 
-        if len(raw_list) < 20 or page_added == 0:
+        if len(raw_list) < 20:
             break
 
     return all_cases
