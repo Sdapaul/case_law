@@ -58,11 +58,14 @@ def send_case_email(cases: list[dict], config: dict) -> None:
             row["sent_date"] = today
             excel_cases.append(row)
         excel_bytes = generate_excel(excel_cases, title="판례목록")
-        fname = f"판례목록_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        fname = f"cases_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
         part = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         part.set_payload(excel_bytes)
         encoders.encode_base64(part)
-        part.add_header("Content-Disposition", f'attachment; filename="{fname}"')
+        part.add_header("Content-Disposition", "attachment", filename=fname)
+        part.add_header("Content-Type",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        name=fname)
         msg.attach(part)
         logger.info(f"Excel 첨부 완료: {fname}")
     except Exception as exc:
@@ -70,7 +73,7 @@ def send_case_email(cases: list[dict], config: dict) -> None:
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(sender, password)
-        server.sendmail(sender, recipients, msg.as_string())
+        server.send_message(msg)
 
     logger.info(f"이메일 발송 완료 → {', '.join(recipients)}")
 
