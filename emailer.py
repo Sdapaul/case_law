@@ -79,6 +79,7 @@ def send_case_email(cases: list[dict], config: dict) -> None:
 
 
 def _build_plain(cases: list[dict], config: dict, recipients: list[str]) -> str:
+    today_str = datetime.now().strftime("%Y.%m.%d")
     lines = [
         f"[판례 알림] {datetime.now().strftime('%Y-%m-%d %H:%M')} 기준 {len(cases)}건",
         "",
@@ -95,7 +96,7 @@ def _build_plain(cases: list[dict], config: dict, recipients: list[str]) -> str:
     for i, c in enumerate(cases, 1):
         is_priority = c.get("priority", False)
         if is_priority != prev_priority:
-            lines.append("★ 주요 관심 법률 판례" if is_priority else "○ 기타 판례")
+            lines.append("★ 주요 관심 판례 (보험·설계사·인공지능·IT·전자금융·개인정보·신용정보·정보통신)" if is_priority else "○ 기타 판례")
             lines.append("-" * 40)
             prev_priority = is_priority
         link = c.get("link", "-") or "-"
@@ -105,6 +106,7 @@ def _build_plain(cases: list[dict], config: dict, recipients: list[str]) -> str:
             f"   사건번호: {c.get('case_num', '-')}",
             f"   법원    : {c.get('court', '-')}",
             f"   선고일  : {c.get('date', '-') or '-'}",
+            f"   게재확인: {today_str} (법제처 등재일 기준)",
             f"   참조URL : {link}",
         ]
         if c.get("summary"):
@@ -118,9 +120,10 @@ def _build_plain(cases: list[dict], config: dict, recipients: list[str]) -> str:
 
 
 def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
-    now_str      = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
-    keywords_str = ", ".join(config.get("keywords", [])) or "없음"
-    court_str    = config.get("court_name") or "전체"
+    now_str       = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
+    today_dot     = datetime.now().strftime("%Y.%m.%d")
+    keywords_str  = ", ".join(config.get("keywords", [])) or "없음"
+    court_str     = config.get("court_name") or "전체"
     case_type_str = config.get("case_type") or "전체"
 
     rows = ""
@@ -132,7 +135,7 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
 
         if is_priority != prev_priority:
             if is_priority:
-                header_label = "&#9733; 주요 관심 법률 판례"
+                header_label = "&#9733; 주요 관심 판례 (보험&#183;설계사&#183;인공지능&#183;IT&#183;전자금융&#183;개인정보&#183;신용정보&#183;정보통신)"
                 header_bg    = "#1a3a6b"
             else:
                 header_label = "&#9675; 기타 판례"
@@ -185,7 +188,10 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
           </td>
           <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{case_num}</td>
           <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{court}</td>
-          <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;color:#111111;font-size:14px;">{date}</td>
+          <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;white-space:nowrap;font-size:14px;">
+            <span style="color:#111111;">{date}</span>
+            <div style="margin-top:3px;font-size:11px;color:#888888;">&#128197; 게재확인 {today_dot}</div>
+          </td>
         </tr>"""
 
     return f"""<!DOCTYPE html>
@@ -215,7 +221,7 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
             <th style="padding:12px 15px;text-align:left;font-weight:600;color:#ffffff;">판례명</th>
             <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;color:#ffffff;">사건번호</th>
             <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;color:#ffffff;">법원</th>
-            <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;color:#ffffff;">선고일</th>
+            <th style="padding:12px 15px;text-align:left;font-weight:600;white-space:nowrap;color:#ffffff;">선고일 / 게재확인</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>

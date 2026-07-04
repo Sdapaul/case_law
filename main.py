@@ -26,6 +26,12 @@ from emailer import send_case_email
 from summarizer import add_ai_summaries
 from db import save_cases
 
+# 제목·참조조문·요약에서 부분 문자열 매칭으로 우선 분류할 키워드
+PRIORITY_KEYWORDS: frozenset[str] = frozenset({
+    "보험", "설계사", "인공지능", "IT", "전자금융",
+    "개인정보", "개인신용정보", "신용정보", "정보통신",
+})
+
 PRIORITY_LAWS = {
     "금융회사의 지배구조에 관한 법률",
     "상법",
@@ -74,9 +80,16 @@ PRIORITY_LAWS = {
 
 
 def _is_priority(case: dict) -> bool:
-    """참조조문 또는 사건명에 우선순위 법률이 포함되어 있으면 True"""
-    text = (case.get("statutes") or "") + " " + (case.get("title") or "")
-    return any(law in text for law in PRIORITY_LAWS)
+    """참조조문·사건명·요약에 우선순위 법령명 또는 관심 키워드가 포함되면 True"""
+    text = (
+        (case.get("statutes") or "") + " "
+        + (case.get("title") or "") + " "
+        + (case.get("summary") or "")
+    )
+    return (
+        any(law in text for law in PRIORITY_LAWS)
+        or any(kw in text for kw in PRIORITY_KEYWORDS)
+    )
 
 
 logging.basicConfig(
