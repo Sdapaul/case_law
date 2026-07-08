@@ -83,6 +83,9 @@ def _build_plain(cases: list[dict], config: dict, recipients: list[str]) -> str:
     lines = [
         f"[판례 알림] {datetime.now().strftime('%Y-%m-%d %H:%M')} 기준 {len(cases)}건",
         "",
+        "※ 판례는 선고일로부터 통상 1~4주 후 법제처에 공시됩니다.",
+        "   이 알림은 오늘자 공시 기준이며, 실제 선고일과 차이가 있을 수 있습니다.",
+        "",
         "검색 조건",
         f"  키워드   : {', '.join(config.get('keywords', [])) or '없음'}",
         f"  법원     : {config.get('court_name') or '전체'}",
@@ -203,6 +206,11 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
     <div style="background:#1a56c4;padding:24px 28px;">
       <h1 style="margin:0;font-size:22px;color:#ffffff;letter-spacing:-0.5px;">&#9878; 판례 알림</h1>
       <p style="margin:6px 0 0;font-size:14px;color:#c8dfff;">{now_str} 기준 &nbsp;|&nbsp; 총 <strong style="color:#ffffff;">{len(cases)}건</strong></p>
+    </div>
+
+    <div style="background:#fff8e1;padding:12px 28px;border-left:4px solid #f59e0b;font-size:13px;color:#555555;">
+      &#9432; 판례는 선고일로부터 통상 <strong>1~4주 후</strong> 법제처에 공시됩니다.
+      이 알림은 오늘자 공시 기준이며, 실제 선고일과 차이가 있을 수 있습니다.
     </div>
 
     <div style="background:#ddeaff;padding:14px 28px;border-left:4px solid #1a56c4;font-size:14px;color:#111111;">
