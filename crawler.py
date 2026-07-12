@@ -124,7 +124,8 @@ def _normalize(raw: dict) -> dict:
         "court": court or "-",
         "case_type": raw.get("사건종류명") or "",
         "date": date_str,
-        "summary": summary[:500],
+        "content": summary[:300],          # 원문 판시사항/판결요지 미리보기 (이메일 표시용)
+        "summary": summary[:500],          # summarizer.py가 AI 요약으로 덮어씀
         "statutes": raw.get("참조조문") or "",  # 참조 법령 (우선순위 정렬용)
         "link": link,
         "is_fresh": is_fresh,

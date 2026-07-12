@@ -84,6 +84,7 @@ def _is_priority(case: dict) -> bool:
     text = (
         (case.get("statutes") or "") + " "
         + (case.get("title") or "") + " "
+        + (case.get("content") or "")
         + (case.get("summary") or "")
     )
     return (

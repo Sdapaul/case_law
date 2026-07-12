@@ -114,6 +114,10 @@ def _build_plain(cases: list[dict], config: dict, recipients: list[str]) -> str:
             f"   게재확인: {today_str} (법제처 등재일 기준)",
             f"   참조URL : {link}",
         ]
+        if c.get("content"):
+            preview = c["content"][:150]
+            suffix = "…" if len(c["content"]) > 150 else ""
+            lines.append(f"   내용   : {preview}{suffix}")
         if c.get("summary"):
             lines.append(f"   AI요약  : {c['summary']}")
         lines.append("")
@@ -161,12 +165,23 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
         case_num = c.get("case_num", "-")
         court    = c.get("court", "-")
         date     = c.get("date", "-") or "-"
+        content  = c.get("content", "")
         summary  = c.get("summary", "")
         fresh_badge = (
             '<span style="display:inline-block;background:#28a745;color:#fff;'
             'font-size:10px;padding:1px 5px;border-radius:3px;margin-left:5px;">최신</span>'
             if is_fresh else ""
         )
+
+        content_html = ""
+        if content:
+            preview = (content[:180] + "…") if len(content) > 180 else content
+            content_html = (
+                f'<div style="margin-top:6px;font-size:12px;color:#444444;'
+                f'line-height:1.6;border-left:2px solid #cccccc;padding-left:8px;">'
+                f'{preview}'
+                f'</div>'
+            )
 
         summary_html = ""
         if summary:
@@ -188,6 +203,7 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
         <tr style="background:{bg};">
           <td style="padding:12px 15px;border-bottom:1px solid #d0d8ee;">
             <a href="{link}" style="color:#1a56c4;text-decoration:none;font-weight:bold;font-size:14px;">{title}</a>{fresh_badge}
+            {content_html}
             {summary_html}
             {url_html}
           </td>
