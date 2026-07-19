@@ -141,3 +141,56 @@ def _check_freshness(date_str: str) -> bool:
         return (datetime.now() - decision_date).days <= FRESH_DAYS
     except ValueError:
         return False
+
+
+_DETAIL_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, */*",
+    "Accept-Language": "ko-KR,ko;q=0.9",
+    "Referer": "https://www.law.go.kr/",
+}
+
+
+def enrich_with_detail(cases: list[dict]) -> None:
+    """목록 API에서 판시사항/판결요지가 비어있는 판례를 상세 API로 보완."""
+    api_key = os.environ.get("LAW_API_KEY", "").strip()
+    if not api_key:
+        return
+    targets = [c for c in cases if not c.get("content") and c.get("seq")]
+    if not targets:
+        return
+    logger.info(f"판시사항 상세 조회 중 ({len(targets)}건)...")
+    for case in targets:
+        seq = case["seq"]
+        try:
+            resp = requests.get(
+                "https://www.law.go.kr/DRF/lawService.do",
+                params={"OC": api_key, "target": "prec", "ID": seq, "type": "JSON"},
+                timeout=15,
+                headers=_DETAIL_HEADERS,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            content = ""
+            for top_key in ("PrecService", "법령", "prec"):
+                node = data.get(top_key, {})
+                if not isinstance(node, dict):
+                    continue
+                for field in ("판시사항", "판결요지", "판례내용"):
+                    val = (node.get(field) or "").strip()
+                    if val:
+                        content = val
+                        break
+                if content:
+                    break
+            if content:
+                case["content"] = content[:300]
+                if not case.get("summary"):
+                    case["summary"] = content[:500]
+        except Exception as exc:
+            logger.debug(f"상세 API 실패 (seq={seq}): {exc}")
+        time.sleep(0.5)

@@ -176,10 +176,11 @@ def _build_html(cases: list[dict], config: dict, recipients: list[str]) -> str:
         content_html = ""
         if content:
             preview = (content[:180] + "…") if len(content) > 180 else content
+            preview = preview.replace("\n", "<br>")
             content_html = (
                 f'<div style="margin-top:6px;font-size:12px;color:#444444;'
                 f'line-height:1.6;border-left:2px solid #cccccc;padding-left:8px;">'
-                f'{preview}'
+                f'<strong style="color:#555555;">판시사항:</strong> {preview}'
                 f'</div>'
             )
 

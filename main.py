@@ -21,7 +21,7 @@ import logging
 import sys
 from pathlib import Path
 
-from crawler import search_cases
+from crawler import search_cases, enrich_with_detail
 from emailer import send_case_email
 from summarizer import add_ai_summaries
 from db import save_cases
@@ -172,6 +172,7 @@ def main() -> None:
         logger.info("새 판례가 없습니다. 이메일을 발송하지 않습니다.")
         return
 
+    enrich_with_detail(new_cases)
     add_ai_summaries(new_cases)
 
     if args.dry_run:
